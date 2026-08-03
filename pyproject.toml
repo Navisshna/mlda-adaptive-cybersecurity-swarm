@@ -1,0 +1,19 @@
+[project]
+name = "mlda-adaptive-cybersecurity-swarm"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "D3VYXNSH", email = "devyansh002@e.ntu.edu.sg" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.13.4",
+]
+
+[project.scripts]
+mlda-adaptive-cybersecurity-swarm = "mlda_adaptive_cybersecurity_swarm:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"

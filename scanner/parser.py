@@ -1,0 +1,78 @@
+"""
+Utilities for converting raw Nuclei results into normalized Finding objects.
+"""
+
+from pathlib import Path
+
+from scanner.models import Finding, Severity
+
+
+def parse_nuclei_results(raw_results: list[dict]) -> list[Finding]:
+    """Convert raw Nuclei output into Finding objects."""
+
+    findings: list[Finding] = []
+
+    for result in raw_results:
+
+        info = result.get("info", {})
+
+        try:
+            severity = Severity(
+                info.get("severity", "info").upper()
+            )
+
+        except ValueError:
+            severity = Severity.INFO
+
+        findings.append(
+            Finding(
+                title=info.get("name", "Unnamed Finding"),
+                severity=severity,
+                url=result.get(
+                    "matched-at",
+                    result.get("host", "unknown"),
+                ),
+                source_tool="nuclei",
+                description=info.get("description"),
+            )
+        )
+
+    return findings
+
+
+def save_findings(
+    findings: list[Finding],
+    path: Path = Path("outputs/findings.jsonl"),
+) -> None:
+    """Save normalized findings as a JSONL file."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    with path.open("w") as file:
+
+        for finding in findings:
+            file.write(finding.model_dump_json() + "\n")
+
+
+def load_findings(
+    path: Path = Path("outputs/findings.jsonl"),
+) -> list[Finding]:
+    """Load normalized findings from a JSONL file."""
+
+    if not path.exists():
+        return []
+
+    findings: list[Finding] = []
+
+    with path.open("r") as file:
+
+        for line in file:
+
+            line = line.strip()
+
+            if line:
+                findings.append(
+                    Finding.model_validate_json(line)
+                )
+
+    return findings

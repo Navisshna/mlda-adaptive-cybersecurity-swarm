@@ -1,33 +1,55 @@
+"""
+Wrapper around the Nuclei CLI.
+
+Executes a scan against a target and returns the raw JSONL
+results as Python dictionaries.
+"""
+
+import json
 import subprocess
 from pathlib import Path
 
 
-OUTPUT_DIR = Path("outputs")
-OUTPUT_FILE = OUTPUT_DIR / "findings.jsonl"
+def run_nuclei(
+    target_url: str,
+    target_name: str,
+    output_dir: Path = Path("outputs"),
+) -> list[dict]:
+    """Run a Nuclei scan and return the raw findings."""
 
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-def run_nuclei(target: str) -> Path:
-    """
-    Runs a Nuclei scan against the given target.
-    Saves the results as JSONL in outputs/findings.jsonl.
-    Returns the path to the output file.
-    """
-
-    OUTPUT_DIR.mkdir(exist_ok=True)
+    raw_output_path = output_dir / f"{target_name}_nuclei_raw.jsonl"
 
     command = [
         "nuclei",
         "-u",
-        target,
-        "-j",
+        target_url,
+        "-jsonl",
         "-o",
-        str(OUTPUT_FILE),
+        str(raw_output_path),
+        "-silent",
     ]
 
-    print(f"Running Nuclei scan on {target}...")
+    subprocess.run(
+        command,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
-    subprocess.run(command, check=True)
+    if not raw_output_path.exists():
+        return []
 
-    print("Scan complete!")
+    results: list[dict] = []
 
-    return OUTPUT_FILE
+    with raw_output_path.open("r") as file:
+
+        for line in file:
+
+            line = line.strip()
+
+            if line:
+                results.append(json.loads(line))
+
+    return results

@@ -10,19 +10,19 @@ from langgraph.graph import StateGraph, START, END
 from langchain.messages import HumanMessage
 from tools import tools
 from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+import os
 
-
-
+load_dotenv()
 graph=StateGraph(ProfilerState)
 
-model_tools=model.bind_tools(tools)
-
-#export From .env
-api='fake api'
+api=os.getenv("AGNES_API")
 
 model = ChatOpenAI(
     api_key=api, base_url="https://apihub.agnes-ai.com/v1",model='agnes-2.0-flash'
 )
+
+model_tools=model.bind_tools(tools)
 
 
 
@@ -69,10 +69,48 @@ def llm_call(state: ProfilerState):
     new: list[BaseMessage] = []
 
     if not messages:
-        system_prompt = """You are a security profiler. Assess the target's type,
-        connectivity, and data sensitivity, and recommend the most conservative safe
-        execution mode. Use the available tools to investigate before concluding.
-        When uncertain, lower your confidence and prefer isolation."""
+        system_prompt = """You are the Profiler Agent in a multi-agent cybersecurity system.
+
+Role
+- Investigate the provided target using the available tools.
+- Classify what the target is and how it is reachable.
+- Report calibrated confidence in that classification.
+
+What you decide
+- target_type: web_app | api | embedded_system | codebase | network_service
+- connectivity: internet_facing | internal | offline | containerised
+- confidence: 0.0-1.0, reflecting how much the tools actually confirmed
+- notes: the evidence trail - what each tool returned, and what you concluded
+
+Your confidence directly controls downstream isolation: below 0.6 the system
+forces sandboxed execution. Do not inflate it.
+
+Method
+- Call classify_input first to establish the shape of the input.
+- For hosts and URLs, confirm reachability with deep_port_scan, tls_inspect,
+  or deep_http_probe before asserting a connectivity level.
+- For filesystem paths, use codebase_inventory.
+- Base every conclusion on tool output you actually received.
+
+Boundaries
+- Do not perform exploitation.
+- Do not execute commands.
+- Do not answer unrelated user questions.
+- Do not invent information a tool did not return.
+- Data sensitivity and regulatory flags are supplied by the user, not inferred
+  by you. Fill the fields as given and spend no tool calls investigating them.
+
+Confidence rules
+- A tool erroring or returning an empty result is NOT evidence that the target
+  is offline or does not exist. tls_inspect fails on plain HTTP; deep_port_scan
+  returns {} for an unresolvable host.
+- If no tool made contact with the target, confidence must not exceed 0.4.
+- When torn between two values, choose the lower one.
+
+Reasoning Style
+- Be conservative.
+- Prefer isolation when uncertain.
+- In notes, state observed facts and inferences separately."""
 
         user_prompt = f"""Target input: {state['raw_input']}
         User-declared sensitivity: {state['declared_sensitivity']}

@@ -67,7 +67,6 @@ def classify_input(raw_input: str) -> dict:
 
         host = raw_input.split(":")[0]
         try:
-            import ipaddress
             ip = ipaddress.ip_address(host)
             return {
                 "shape": "ip",

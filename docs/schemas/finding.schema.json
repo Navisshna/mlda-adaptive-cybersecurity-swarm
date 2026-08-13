@@ -1,0 +1,138 @@
+{
+  "additionalProperties": false,
+  "description": "Represent one validated security finding.",
+  "properties": {
+    "finding_id": {
+      "description": "Unique identifier for the finding.",
+      "title": "Finding Id",
+      "type": "string"
+    },
+    "run_id": {
+      "description": "Identifier for the complete swarm run.",
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "target_id": {
+      "description": "Identifier for the target being assessed.",
+      "minLength": 1,
+      "title": "Target Id",
+      "type": "string"
+    },
+    "agent_name": {
+      "description": "Agent that produced the finding.",
+      "minLength": 1,
+      "title": "Agent Name",
+      "type": "string"
+    },
+    "tool_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Tool that produced the evidence.",
+      "title": "Tool Name"
+    },
+    "title": {
+      "description": "Short title describing the finding.",
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "description": "Detailed explanation of the finding.",
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    },
+    "severity": {
+      "default": "info",
+      "description": "Severity classification.",
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "affected_component": {
+      "description": "Affected port, URL, service, or component.",
+      "minLength": 1,
+      "title": "Affected Component",
+      "type": "string"
+    },
+    "evidence": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Evidence or tool output supporting the finding.",
+      "title": "Evidence"
+    },
+    "recommendation": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Recommended remediation.",
+      "title": "Recommendation"
+    },
+    "cvss_score": {
+      "anyOf": [
+        {
+          "maximum": 10.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "CVSS score from 0.0 to 10.0.",
+      "title": "Cvss Score"
+    },
+    "references": {
+      "description": "Relevant references such as CVE identifiers.",
+      "items": {
+        "type": "string"
+      },
+      "title": "References",
+      "type": "array"
+    },
+    "timestamp": {
+      "description": "Time at which the finding was created.",
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "target_id",
+    "agent_name",
+    "title",
+    "description",
+    "affected_component"
+  ],
+  "title": "Finding",
+  "type": "object"
+}

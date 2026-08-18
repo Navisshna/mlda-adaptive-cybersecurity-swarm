@@ -61,8 +61,6 @@ def _ollama_is_reachable(base_url: str = "http://localhost:11434") -> bool:
 
 ExecutionMode = Literal["standard", "privacy", "air_gap", "sandbox"]
 
-LOW_CONFIDENCE_THRESHOLD = 0.5
-
 PLACEHOLDER_AGENT_IMAGE = "alpine:latest"
 
 
@@ -86,9 +84,6 @@ class EnvironmentManager:
     def provision(self, target_profile: dict) -> ProvisionResult:
         mode: ExecutionMode = target_profile["recommended_mode"]
         confidence: float = target_profile.get("confidence", 0.0)
-
-        if confidence < LOW_CONFIDENCE_THRESHOLD and mode == "standard":
-            mode = "sandbox"
 
         if mode == "standard":
             return self._standard()

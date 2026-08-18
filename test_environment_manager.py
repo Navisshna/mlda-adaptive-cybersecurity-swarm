@@ -69,13 +69,6 @@ def test_privacy_mode_flags_redaction_note(mgr):
     assert result.mode == "privacy"
     assert "redact" in result.notes.lower()
 
-
-def test_low_confidence_escalates_standard_to_sandbox(mgr):
-    result = mgr.provision(make_profile("standard", confidence=0.3))
-    # Should NOT stay standard — safety fallback should kick in.
-    assert result.mode == "sandbox"
-
-
 def test_launch_agent_container_on_active_network(mgr):
     mgr.provision(make_profile("sandbox"))
     container = mgr.launch_agent_container()

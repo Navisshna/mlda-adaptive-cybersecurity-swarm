@@ -22,6 +22,9 @@ Mode definitions (per Profiler schema notes):
     privacy   -> standard process, but findings get PII-pattern redaction
                  before hitting the findings store
     air_gap   -> agents have no access to the internet
+
+NOTE: Docker is a hard requirement for this module, not optional — every
+mode except "standard" depends on it to actually provision isolation.
 """
 
 from __future__ import annotations
@@ -29,12 +32,7 @@ from dataclasses import dataclass
 from typing import Literal, Optional
 from langchain_ollama import ChatOllama
 
-try:
-    import docker
-except ImportError:
-    # Lets this file be imported/tested even before docker is installed locally.
-    docker = None
-
+import docker  # hard dependency — this module cannot function without it
 
 
 def get_llm_client(backend: str):
@@ -47,7 +45,7 @@ def get_llm_client(backend: str):
             temperature=0.2,
         )
     elif backend == "grok":
-        raise NotImplementedError("wire up existing grok client here")
+        raise NotImplementedError("wire up existing grok/groq client here — not owned by this module")
     else:
         raise ValueError(f"Unknown llm_backend: {backend}")
 
@@ -59,19 +57,20 @@ def _ollama_is_reachable(base_url: str = "http://localhost:11434") -> bool:
         return True
     except Exception:
         return False
-    
+
+
 ExecutionMode = Literal["standard", "privacy", "air_gap", "sandbox"]
 
-# Below this confidence, the Profiler itself said it prefers to fall back
-# to more isolation rather than trust its own classification.
 LOW_CONFIDENCE_THRESHOLD = 0.5
+
+PLACEHOLDER_AGENT_IMAGE = "alpine:latest"
 
 
 @dataclass
 class ProvisionResult:
     mode: ExecutionMode
     network_id: Optional[str]
-    llm_backend: str          # "grok" (cloud) or "ollama" (local)
+    llm_backend: str
     internet_allowed: bool
     notes: str = ""
 
@@ -80,15 +79,14 @@ class EnvironmentManager:
     """Builds and tears down the isolated runtime for the specialist swarm."""
 
     def __init__(self):
-        self.client = docker.from_env() if docker else None
+        self.client = docker.from_env()
         self._active_network = None
+        self._active_containers: list = []
 
     def provision(self, target_profile: dict) -> ProvisionResult:
         mode: ExecutionMode = target_profile["recommended_mode"]
         confidence: float = target_profile.get("confidence", 0.0)
 
-        # Safety fallback: low-confidence classification should not run
-        # in a less-isolated mode than sandbox.
         if confidence < LOW_CONFIDENCE_THRESHOLD and mode == "standard":
             mode = "sandbox"
 
@@ -122,6 +120,7 @@ class EnvironmentManager:
         self._active_network = net
         if not _ollama_is_reachable():
             net.remove()
+            self._active_network = None
             raise RuntimeError("privacy mode requires Ollama running locally, but it's unreachable")
         return ProvisionResult(
             mode="privacy", network_id=net.id,
@@ -134,21 +133,42 @@ class EnvironmentManager:
         self._active_network = net
         if not _ollama_is_reachable():
             net.remove()
+            self._active_network = None
             raise RuntimeError("air_gap mode requires Ollama running locally, but it's unreachable — no fallback available")
         return ProvisionResult(
             mode="air_gap", network_id=net.id,
             llm_backend="ollama", internet_allowed=False,
         )
 
+    def launch_agent_container(self, image: str = PLACEHOLDER_AGENT_IMAGE,
+                                command: str = "echo 'agent container online'"):
+        if not self._active_network:
+            raise RuntimeError("No active network — call provision() with a mode that creates one first")
+
+        container = self.client.containers.run(
+            image,
+            command=command,
+            network=self._active_network.name,
+            detach=True,
+            remove=True,
+        )
+        self._active_containers.append(container)
+        return container
+
     def teardown(self):
+        for c in self._active_containers:
+            try:
+                c.stop()
+            except Exception:
+                pass
+        self._active_containers = []
+
         if self._active_network:
             self._active_network.remove()
             self._active_network = None
 
 
 if __name__ == "__main__":
-    # Mock Target Profile matching Darren's exact schema, so this can be
-    # tested against a realistic input before his agent is finished.
     mock_profile = {
         "target_id": "test-001",
         "raw_input": "http://localhost:8080",
@@ -156,16 +176,22 @@ if __name__ == "__main__":
         "connectivity": "internet_facing",
         "data_sensitivity": "low",
         "regulatory_flags": [],
-        "recommended_mode": "air_gap",
-        "confidence": 0.3,
+        "recommended_mode": "sandbox",
+        "confidence": 0.87,
         "notes": "DVWA test instance",
     }
 
     mgr = EnvironmentManager()
     result = mgr.provision(mock_profile)
     print(result)
+
+    if result.network_id:
+        container = mgr.launch_agent_container()
+        print("Container launched:", container.name)
+
     if result.llm_backend == "ollama":
         llm = get_llm_client(result.llm_backend)
         test_response = llm.invoke("Say 'agent online' if you can read this.")
         print("LLM test:", test_response.content)
+
     mgr.teardown()

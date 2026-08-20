@@ -77,15 +77,23 @@ class TargetProfile(BaseModel):
         description="Profiler's confidence in this classification (0.0-1.0). "
         "Low-confidence profiles push mode selection toward more isolation.",
     )
+    is_blocked: bool = Field(
+        default=False,
+        description="Flag indicating if the target input was blocked due to malicious patterns.",
+    )
+    block_reason: Optional[str] = Field(
+        default=None,
+        description="Detailed explanation if the input was blocked.",
+    )
     notes: Optional[str] = Field(
         default=None,
         description="Free-text reasoning trail from the Profiler, including a "
         "summary of the deep-recon evidence gathered.",
     )
- 
- 
+
+
 # --- LangGraph state --------------------------------------------------------
- 
+
 class ProfilerState(TypedDict, total=False):
     raw_input: str
     declared_sensitivity: DataSensitivity
@@ -97,6 +105,11 @@ class ProfilerState(TypedDict, total=False):
 
     #retry 
     retry : int
+
+    #blocking
+    is_blocked: Optional[bool]
+    block_reason: Optional[str]
+
 
 
 

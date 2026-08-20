@@ -1,9 +1,8 @@
+from input_validator import validate_input
 from schema import ExecutionMode
 from schema import TargetProfile
 from schema import ProfilerState
 from langchain_core.messages import ToolMessage
-from langsmith._openapi_client.types import run_select_field
-from langgraph.prebuilt import ToolCallTransformer
 from langchain_core.messages import SystemMessage, BaseMessage
 from langgraph.prebuilt import ToolNode
 from langgraph.graph import StateGraph, START, END
@@ -65,6 +64,18 @@ def _select_execution_mode(p: TargetProfile) -> ExecutionMode:
 
 
 def llm_call(state: ProfilerState):
+    # Pre-execution threat screening for malicious inputs (Categories 1, 2, 4, 7)
+    is_malicious, reason = validate_input(
+        state.get("raw_input", ""),
+        state.get("declared_regulatory", []),
+    )
+    if is_malicious:
+        return {
+            "is_blocked": True,
+            "block_reason": reason,
+            "retry": state.get("retry", 0) + 1,
+        }
+
     messages = list(state.get("messages") or [])
     new: list[BaseMessage] = []
 
@@ -121,24 +132,37 @@ Reasoning Style
         messages = new
 
     response = model_tools.invoke(messages)
-    
-
-
 
     return {"messages": [*new, response], "retry": state.get("retry", 0) + 1}
 
 
 def finalize(state: ProfilerState):
+    declared_sensitivity = state["declared_sensitivity"]
+    declared_regulatory = state.get("declared_regulatory", [])
+
+    if state.get("is_blocked"):
+        profile = TargetProfile(
+            target_id=state["target_id"],
+            raw_input=state["raw_input"],
+            target_type="network_service",
+            connectivity="offline",
+            data_sensitivity=declared_sensitivity,
+            regulatory_flags=declared_regulatory,
+            recommended_mode="sandbox",
+            confidence=0.0,
+            is_blocked=True,
+            block_reason=state.get("block_reason"),
+            notes=f"BLOCKED MALICIOUS INPUT: {state.get('block_reason')}",
+        )
+        profile.recommended_mode = _select_execution_mode(profile)
+        return {'profile': profile}
 
     messages = [
         *state["messages"],
         HumanMessage("Using the evidence above, produce the TargetProfile."),
     ]
-    profile = model.with_structured_output(TargetProfile).invoke(messages)
+    profile = model.with_structured_output(TargetProfile,method="function_calling").invoke(messages)
 
-    declared_sensitivity = state["declared_sensitivity"]
-    declared_regulatory = state.get("declared_regulatory", [])
-    
     profile = TargetProfile(
         **{
             **profile.model_dump(),
@@ -146,10 +170,12 @@ def finalize(state: ProfilerState):
             "raw_input": state["raw_input"],
             "data_sensitivity": declared_sensitivity,
             "regulatory_flags": declared_regulatory,
+            "is_blocked": False,
+            "block_reason": None,
         }
     )
-    tools_msgs = [m for m in state['messages'] if isinstance(m,ToolMessage)]
-   # a target counts as OBSERVED if any tool actually made contact with it.
+    tools_msgs = [m for m in state.get('messages', []) if isinstance(m, ToolMessage)]
+    # a target counts as OBSERVED if any tool actually made contact with it.
     # ratio-of-errors doesn't work: deep_port_scan can never fail (it reports
     # {} open ports for a host that doesn't resolve), so it dilutes the ratio,
     # while tls_inspect against a plain-HTTP port errors on a target that was
@@ -163,15 +189,20 @@ def finalize(state: ProfilerState):
     if tools_msgs and not reached:
         profile.confidence = min(profile.confidence, 0.4)
 
-
-
     profile.recommended_mode = _select_execution_mode(profile)
     return {'profile': profile}
 
 def should_route(state: ProfilerState):
-    lm=state['messages'][-1]
+    if state.get("is_blocked"):
+        return 'final'
 
-    if state['retry']==10:
+    messages = state.get("messages") or []
+    if not messages:
+        return 'final'
+
+    lm = messages[-1]
+
+    if state.get('retry') == 10:
         return 'final'
     if getattr(lm, "tool_calls", None):
         return "tools"

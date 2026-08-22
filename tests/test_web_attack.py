@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from agents.web_attack.attacker import (
     run_sql_injection_test,
     run_xss_test,
@@ -104,3 +107,44 @@ def test_web_attack_runs_both_tools(monkeypatch):
     assert len(findings) == 2
     assert findings[0].source_tool == "sqlmap"
     assert findings[1].source_tool == "dalfox"
+
+
+def test_web_attack_accepts_valid_url(monkeypatch):
+    def fake_run_sqlmap(target_url, cookie):
+        return "No injection detected"
+
+    def fake_run_dalfox(target_url, cookie):
+        return "XSS found 0 XSS"
+
+    monkeypatch.setattr(
+        "agents.web_attack.attacker.run_sqlmap",
+        fake_run_sqlmap,
+    )
+
+    monkeypatch.setattr(
+        "agents.web_attack.attacker.run_dalfox",
+        fake_run_dalfox,
+    )
+
+    findings = run_web_attack(
+        "http://localhost:4280",
+        "PHPSESSID=test; security=low",
+    )
+
+    assert findings == []
+
+
+def test_web_attack_rejects_invalid_url():
+    with pytest.raises(ValidationError):
+        run_web_attack(
+            "not-a-valid-url",
+            "PHPSESSID=test",
+        )
+
+
+def test_web_attack_rejects_unsupported_scheme():
+    with pytest.raises(ValidationError):
+        run_web_attack(
+            "ftp://localhost:4280",
+            "PHPSESSID=test",
+        )

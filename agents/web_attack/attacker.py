@@ -1,13 +1,14 @@
 from concurrent.futures import ThreadPoolExecutor
 
 from schemas.finding import Finding, Severity
+from schemas.web_attack import WebAttackInput
 from tools.dalfox import run_dalfox
 from tools.sqlmap import run_sqlmap
 
 
 def run_sql_injection_test(
     target_url: str,
-    cookie: str,
+    cookie: str | None,
 ) -> list[Finding]:
     """Run SQLMap and convert SQL injection detections into findings."""
 
@@ -23,7 +24,7 @@ def run_sql_injection_test(
         Finding(
             title="SQL Injection",
             severity=Severity.HIGH,
-            url=target_url,
+            url=str(target_url),
             source_tool="sqlmap",
             description="SQLMap detected an injectable parameter.",
         )
@@ -32,7 +33,7 @@ def run_sql_injection_test(
 
 def run_xss_test(
     target_url: str,
-    cookie: str,
+    cookie: str | None,
 ) -> list[Finding]:
     """Run Dalfox and convert XSS detections into findings."""
 
@@ -51,7 +52,7 @@ def run_xss_test(
         Finding(
             title="Cross-Site Scripting (XSS)",
             severity=Severity.HIGH,
-            url=target_url,
+            url=str(target_url),
             source_tool="dalfox",
             description="Dalfox detected a potential XSS vulnerability.",
         )
@@ -60,21 +61,28 @@ def run_xss_test(
 
 def run_web_attack(
     target_url: str,
-    cookie: str,
+    cookie: str | None = None,
 ) -> list[Finding]:
-    """Run SQLMap and Dalfox concurrently against a target."""
+    """Validate input, then run SQLMap and Dalfox concurrently."""
+
+    validated_input = WebAttackInput(
+        target_url=target_url,
+        cookie=cookie,
+    )
+
+    validated_url = str(validated_input.target_url)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         sql_future = executor.submit(
             run_sql_injection_test,
-            target_url,
-            cookie,
+            validated_url,
+            validated_input.cookie,
         )
 
         xss_future = executor.submit(
             run_xss_test,
-            target_url,
-            cookie,
+            validated_url,
+            validated_input.cookie,
         )
 
         findings = []

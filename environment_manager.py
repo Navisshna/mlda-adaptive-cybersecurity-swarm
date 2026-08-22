@@ -19,12 +19,13 @@ Upstream contract (from Profiler schema, pydantic-based):
 Mode definitions (per Profiler schema notes):
     standard  -> simple python process, no isolation
     sandbox   -> agents run inside an isolated Docker container
-    privacy   -> standard process, but findings get PII-pattern redaction
-                 before hitting the findings store
+    privacy   -> isolated Docker network + local Ollama; internet allowed;
+                 findings flagged for PII-pattern redaction before hitting
+                 the findings store
     air_gap   -> agents have no access to the internet
 
 NOTE: Docker is a hard requirement for this module, not optional — every
-mode except "standard" depends on it to actually provision isolation.
+mode depends on it to actually provision isolation.
 """
 
 from __future__ import annotations
@@ -81,6 +82,15 @@ class EnvironmentManager:
         self._active_network = None
         self._active_containers: list = []
 
+    def _get_or_create_network(self, name: str, internal: bool):
+        """Reuse a leftover network if one already exists under this name
+        (e.g. from a previous run that crashed before teardown() ran),
+        instead of failing with a 'network already exists' error."""
+        existing = self.client.networks.list(names=[name])
+        if existing:
+            return existing[0]
+        return self.client.networks.create(name, driver="bridge", internal=internal)
+
     def provision(self, target_profile: dict) -> ProvisionResult:
         mode: ExecutionMode = target_profile["recommended_mode"]
         confidence: float = target_profile.get("confidence", 0.0)
@@ -103,7 +113,7 @@ class EnvironmentManager:
         )
 
     def _sandbox(self) -> ProvisionResult:
-        net = self.client.networks.create("swarm-sandbox", driver="bridge", internal=False)
+        net = self._get_or_create_network("swarm-sandbox", internal=False)
         self._active_network = net
         return ProvisionResult(
             mode="sandbox", network_id=net.id,
@@ -111,7 +121,7 @@ class EnvironmentManager:
         )
 
     def _privacy(self) -> ProvisionResult:
-        net = self.client.networks.create("swarm-privacy", driver="bridge", internal=False)
+        net = self._get_or_create_network("swarm-privacy", internal=False)
         self._active_network = net
         if not _ollama_is_reachable():
             net.remove()
@@ -124,7 +134,7 @@ class EnvironmentManager:
         )
 
     def _air_gap(self) -> ProvisionResult:
-        net = self.client.networks.create("swarm-airgap", driver="bridge", internal=True)
+        net = self._get_or_create_network("swarm-airgap", internal=True)
         self._active_network = net
         if not _ollama_is_reachable():
             net.remove()
@@ -171,7 +181,7 @@ if __name__ == "__main__":
         "connectivity": "internet_facing",
         "data_sensitivity": "low",
         "regulatory_flags": [],
-        "recommended_mode": "sandbox",
+        "recommended_mode": "air_gap",
         "confidence": 0.87,
         "notes": "DVWA test instance",
     }

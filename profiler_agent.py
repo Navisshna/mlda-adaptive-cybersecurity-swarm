@@ -71,10 +71,18 @@ def llm_call(state: ProfilerState):
     )
     if is_malicious:
         return {
+            'agent_name': 'profiler',
+            'status': 'blocked',
             "is_blocked": True,
             "block_reason": reason,
             "retry": state.get("retry", 0) + 1,
+            'error': [reason],
+            'metadata': {
+                'target_id': state.get('target_id'),
+                'raw_input': state.get('raw_input'),
+            }
         }
+
 
     messages = list(state.get("messages") or [])
     new: list[BaseMessage] = []
@@ -133,7 +141,14 @@ Reasoning Style
 
     response = model_tools.invoke(messages)
 
-    return {"messages": [*new, response], "retry": state.get("retry", 0) + 1}
+    return {"agent_name": 'profiler', 
+    "status": "running", 
+    "messages": [*new, response],
+     "retry": state.get("retry", 0) + 1,
+     'metadata': {
+        'target_id': state['target_id'],
+        'raw_input': state['raw_input'],
+    }}
 
 
 def finalize(state: ProfilerState):
@@ -155,7 +170,7 @@ def finalize(state: ProfilerState):
             notes=f"BLOCKED MALICIOUS INPUT: {state.get('block_reason')}",
         )
         profile.recommended_mode = _select_execution_mode(profile)
-        return {'profile': profile}
+        return {'profile': profile,'status':'blocked'}
 
     messages = [
         *state["messages"],
@@ -190,7 +205,10 @@ def finalize(state: ProfilerState):
         profile.confidence = min(profile.confidence, 0.4)
 
     profile.recommended_mode = _select_execution_mode(profile)
-    return {'profile': profile}
+    return {'profile': profile,'status':'completed','error': state.get('error', []),
+        'metadata': {
+            'target_id': state.get('target_id'),
+            'raw_input': state.get('raw_input')} }
 
 def should_route(state: ProfilerState):
     if state.get("is_blocked"):

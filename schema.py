@@ -1,3 +1,5 @@
+from typing import Dict
+from typing import Any
 from langgraph.graph import add_messages
 from langchain_core.messages import BaseMessage
 from typing import Annotated
@@ -101,14 +103,23 @@ class ProfilerState(TypedDict, total=False):
     target_id: str
     #for LLM
     messages: Annotated[list[BaseMessage], add_messages]
-    profile: Optional[TargetProfile]
 
     #retry 
     retry : int
 
+
     #blocking
     is_blocked: Optional[bool]
     block_reason: Optional[str]
+
+    #extended info for orchestra / logging purposes
+    agent_name : Optional[str] 
+    #findings
+    profile: Optional[TargetProfile]
+    #pending as default 
+    status: Literal['pending','running','completed','blocked','failed']
+    error: Optional[List[str]]
+    metadata:Optional[ Dict[str, Any]]
 
 
 

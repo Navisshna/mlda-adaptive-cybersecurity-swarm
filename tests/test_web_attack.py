@@ -104,9 +104,10 @@ def test_web_attack_runs_both_tools(monkeypatch):
         "PHPSESSID=test; security=low",
     )
 
-    assert len(findings) == 2
-    assert findings[0].source_tool == "sqlmap"
-    assert findings[1].source_tool == "dalfox"
+
+    assert len(findings.findings) == 2
+    assert findings.findings[0].source_tool == "sqlmap"
+    assert findings.findings[1].source_tool == "dalfox"
 
 
 def test_web_attack_accepts_valid_url(monkeypatch):
@@ -131,7 +132,7 @@ def test_web_attack_accepts_valid_url(monkeypatch):
         "PHPSESSID=test; security=low",
     )
 
-    assert findings == []
+    assert findings.findings == []
 
 
 def test_web_attack_rejects_invalid_url():

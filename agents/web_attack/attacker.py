@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 
+from schemas.agent_result import AgentResult
 from schemas.finding import Finding, Severity
 from schemas.web_attack import WebAttackInput
 from tools.dalfox import run_dalfox
@@ -62,7 +63,7 @@ def run_xss_test(
 def run_web_attack(
     target_url: str,
     cookie: str | None = None,
-) -> list[Finding]:
+) -> AgentResult:
     """Validate input, then run SQLMap and Dalfox concurrently."""
 
     validated_input = WebAttackInput(
@@ -89,4 +90,16 @@ def run_web_attack(
         findings.extend(sql_future.result())
         findings.extend(xss_future.result())
 
-    return findings
+    return AgentResult(
+        agent_name="web_attack",
+        status="success",
+        findings=findings,
+        observations=[
+            "SQLMap and Dalfox completed successfully."
+        ],
+        errors=[],
+        metadata={
+            "target_url": validated_url,
+            "tools": ["sqlmap", "dalfox"],
+        },
+    )

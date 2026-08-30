@@ -3,10 +3,13 @@
 from pathlib import Path
 
 from mlda_swarm.reporting.report_models import SecurityReport
+from mlda_swarm.reporting.report_generator import build_safe_report_data
 
 
 def render_markdown_report(report: SecurityReport) -> str:
     """Convert a structured SecurityReport into Markdown."""
+    safe_data = build_safe_report_data(report)
+    report = SecurityReport.model_validate(safe_data)
 
     lines: list[str] = []
 

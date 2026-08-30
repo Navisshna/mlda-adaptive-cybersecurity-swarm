@@ -1,0 +1,398 @@
+\documentclass[11pt,a4paper]{article}
+
+% =================================================
+% PACKAGES
+% =================================================
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+
+% =================================================
+% PAGE SETUP
+% =================================================
+
+\pagestyle{fancy}
+\fancyhf{}
+
+\fancyhead[L]{Cybersecurity Assessment Report}
+\fancyhead[R]{MLDA Swarm}
+
+\fancyfoot[C]{\thepage}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% =================================================
+% DOCUMENT
+% =================================================
+
+\begin{document}
+
+% =================================================
+% TITLE PAGE
+% =================================================
+
+\begin{titlepage}
+
+    \centering
+
+    \vspace*{3cm}
+
+    {\Huge\bfseries Cybersecurity Assessment Report\par}
+
+    \vspace{1cm}
+
+    {\Large MLDA Adaptive Cybersecurity Swarm\par}
+
+    \vfill
+
+    \begin{tabular}{ll}
+
+        \textbf{Run ID:}
+        &
+        {{ report.run_id | latex }}
+        \\
+
+        \textbf{Target(s):}
+        &
+        {{ report.target_ids | join(", ") | latex }}
+        \\
+
+        \textbf{Generated At:}
+        &
+        {{ report.generated_at | latex }}
+        \\
+
+    \end{tabular}
+
+    \vfill
+
+    {\large Confidential Security Assessment}
+
+\end{titlepage}
+
+
+% =================================================
+% TABLE OF CONTENTS
+% =================================================
+
+\tableofcontents
+
+\newpage
+
+
+% =================================================
+% ASSESSMENT INFORMATION
+% =================================================
+
+\section{Assessment Information}
+
+\begin{itemize}[leftmargin=*]
+
+    \item \textbf{Run ID:}
+    {{ report.run_id | latex }}
+
+    \item \textbf{Target(s):}
+    {{ report.target_ids | join(", ") | latex }}
+
+    \item \textbf{Generated At:}
+    {{ report.generated_at | latex }}
+
+\end{itemize}
+
+
+% =================================================
+% EXECUTIVE SUMMARY
+% =================================================
+
+\section{Executive Summary}
+
+{% if report.executive_summary %}
+
+{{ report.executive_summary | latex }}
+
+{% else %}
+
+Executive summary has not yet been generated.
+
+{% endif %}
+
+
+% =================================================
+% SEVERITY SUMMARY
+% =================================================
+
+\section{Severity Summary}
+
+\begin{table}[h]
+    \centering
+
+    \begin{tabular}{lc}
+
+        \toprule
+
+        \textbf{Severity}
+        &
+        \textbf{Number of Findings}
+        \\
+
+        \midrule
+
+        Critical
+        &
+        {{ report.severity_summary.critical }}
+        \\
+
+        High
+        &
+        {{ report.severity_summary.high }}
+        \\
+
+        Medium
+        &
+        {{ report.severity_summary.medium }}
+        \\
+
+        Low
+        &
+        {{ report.severity_summary.low }}
+        \\
+
+        Informational
+        &
+        {{ report.severity_summary.info }}
+        \\
+
+        \midrule
+
+        \textbf{Total}
+        &
+        \textbf{ {{ report.severity_summary.total }} }
+        \\
+
+        \bottomrule
+
+    \end{tabular}
+
+    \caption{Summary of identified security findings}
+
+\end{table}
+
+
+% =================================================
+% DETAILED FINDINGS
+% =================================================
+
+\newpage
+
+\section{Detailed Findings}
+
+
+{% if report.findings %}
+
+
+{% for finding in report.findings %}
+
+% -------------------------------------------------
+% Finding
+% -------------------------------------------------
+
+\subsection{ {{ finding.title | latex }} }
+
+\begin{itemize}[leftmargin=*]
+
+    \item \textbf{Finding ID:}
+    {{ finding.finding_id | latex }}
+
+    \item \textbf{Severity:}
+    {{ finding.severity | capitalize | latex }}
+
+    \item \textbf{CVSS Score:}
+
+    {% if finding.cvss_score is not none %}
+
+    {{ finding.cvss_score }}
+
+    {% else %}
+
+    Not scored
+
+    {% endif %}
+
+    \item \textbf{Affected Component:}
+    {{ finding.affected_component | latex }}
+
+    \item \textbf{Detected By:}
+    {{ finding.agent_name | latex }}
+
+
+    {% if finding.tool_name %}
+
+    \item \textbf{Tool:}
+    {{ finding.tool_name | latex }}
+
+    {% endif %}
+
+\end{itemize}
+
+
+% -------------------------------------------------
+% Description
+% -------------------------------------------------
+
+\subsubsection*{Description}
+
+{{ finding.description | latex }}
+
+
+% -------------------------------------------------
+% Evidence
+% -------------------------------------------------
+
+\subsubsection*{Evidence}
+
+{% if finding.evidence %}
+
+\begin{quote}
+
+{{ finding.evidence | latex }}
+
+\end{quote}
+
+{% else %}
+
+No additional evidence provided.
+
+{% endif %}
+
+
+% -------------------------------------------------
+% Recommendation
+% -------------------------------------------------
+
+\subsubsection*{Recommendation}
+
+{% if finding.recommendation %}
+
+{{ finding.recommendation | latex }}
+
+{% else %}
+
+No remediation recommendation provided.
+
+{% endif %}
+
+
+% -------------------------------------------------
+% References
+% -------------------------------------------------
+
+{% if finding.references %}
+
+\subsubsection*{References}
+
+\begin{itemize}
+
+{% for reference in finding.references %}
+
+    \item {{ reference | latex }}
+
+{% endfor %}
+
+\end{itemize}
+
+{% endif %}
+
+
+\vspace{0.5cm}
+
+\hrule
+
+\vspace{0.5cm}
+
+
+{% endfor %}
+
+
+{% else %}
+
+No security findings were identified during this assessment.
+
+{% endif %}
+
+
+% =================================================
+% GENERAL RECOMMENDATIONS
+% =================================================
+
+\newpage
+
+\section{General Recommendations}
+
+The following remediation approach is recommended based on the
+findings identified during the assessment:
+
+\begin{enumerate}
+
+    \item Address Critical severity findings immediately.
+
+    \item Prioritise High severity vulnerabilities after Critical
+    findings have been addressed.
+
+    \item Review and remediate Medium severity findings according to
+    the affected system's risk profile.
+
+    \item Patch outdated software and exposed services.
+
+    \item Review authentication and access-control mechanisms.
+
+    \item Rotate credentials if credential exposure has been detected.
+
+    \item Conduct a follow-up security assessment after remediation.
+
+\end{enumerate}
+
+
+% =================================================
+% REPORT INFORMATION
+% =================================================
+
+\section{Report Information}
+
+This report was generated by the MLDA Adaptive Cybersecurity Swarm.
+
+The assessment is associated with the following run identifier:
+
+\begin{quote}
+
+\textbf{Run ID:}
+{{ report.run_id | latex }}
+
+\end{quote}
+
+Sensitive information identified during assessment processing may be
+redacted from the exported report.
+
+Where redaction has been applied, sensitive values may appear as:
+
+\begin{quote}
+
+\texttt{[REDACTED]}
+
+\end{quote}
+
+Operational logs, prompts, tool-call details, latency measurements,
+token usage and other internal execution metadata are maintained
+separately from this assessment report.
+
+
+% =================================================
+% END DOCUMENT
+% =================================================
+
+\end{document}

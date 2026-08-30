@@ -89,3 +89,35 @@ def test_save_markdown_report(tmp_path):
 
     assert "# Cybersecurity Assessment Report" in content
     assert "Open HTTP Port" in content
+
+def test_markdown_report_redacts_sensitive_evidence():
+    finding = Finding(
+        run_id="run-001",
+        target_id="dvwa",
+        agent_name="web_attack",
+        title="Exposed Credentials",
+        description="Credentials were exposed.",
+        severity="critical",
+        affected_component="/admin",
+        evidence="password=SuperSecret123",
+        recommendation="Rotate the exposed credentials.",
+    )
+
+    report = build_security_report(
+        run_id="run-001",
+        findings=[finding],
+    )
+
+    markdown = render_markdown_report(report)
+
+    # Sensitive value must not appear
+    assert "SuperSecret123" not in markdown
+
+    # Redaction marker should appear
+    assert "[REDACTED]" in markdown
+
+    # Important report information should remain
+    assert "run-001" in markdown
+    assert "Exposed Credentials" in markdown
+    assert "Critical" in markdown
+    assert "/admin" in markdown

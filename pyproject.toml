@@ -4,9 +4,12 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
+    "jinja2>=3.1.6",
     "langgraph>=1.2.10",
+    "ollama>=0.6.2",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
+    "xai-sdk>=1.18.0",
 ]
 
 [project.scripts]
